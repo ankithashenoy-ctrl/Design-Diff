@@ -1,0 +1,2062 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Design Diff — Smart QA</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg: #0f0f11;
+      --surface: #1a1a1f;
+      --surface-2: #242429;
+      --border: #2e2e35;
+      --text: #e8e8ed;
+      --text-muted: #aaaaб8;
+      --text-secondary: #888893;
+      --accent: #6e6eff;
+      --accent-hover: #8585ff;
+      --danger: #ff6b6b;
+      --success: #4ecb71;
+      --warning: #f5a623;
+      --radius: 8px;
+      --panel-w: 272px;
+      --ai-panel-w: 360px;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    /* ── Header ── */
+    header {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      padding: 10px 18px;
+      border-bottom: 1px solid var(--border);
+      background: var(--surface);
+      flex-shrink: 0;
+      min-height: 50px;
+    }
+    header h1 { font-size: 14px; font-weight: 600; letter-spacing: -0.01em; white-space: nowrap; }
+    .tagline { font-size: 11px; color: var(--text-secondary); white-space: nowrap; }
+    .header-right { margin-left: auto; display: flex; align-items: center; gap: 8px; }
+
+    .mode-group {
+      display: flex; gap: 2px;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 3px;
+    }
+    .mode-btn {
+      padding: 5px 13px;
+      border: none; border-radius: 5px;
+      background: transparent;
+      color: var(--text-secondary);
+      font-size: 12px; font-weight: 500;
+      cursor: pointer;
+      transition: background 0.15s, color 0.15s;
+      display: flex; align-items: center; gap: 5px;
+    }
+    .mode-btn.active { background: var(--surface-2); color: var(--text); }
+    .mode-btn:hover:not(.active) { color: var(--text); }
+    .mode-btn .dot {
+      width: 6px; height: 6px; border-radius: 50%;
+      background: var(--accent); opacity: 0; transition: opacity 0.15s;
+    }
+    .mode-btn.active .dot { opacity: 1; }
+
+    /* ── Workspace ── */
+    .workspace { display: flex; flex: 1; overflow: hidden; }
+
+    /* ── Left panel ── */
+    .panel {
+      width: var(--panel-w);
+      background: var(--surface);
+      border-right: 1px solid var(--border);
+      display: flex; flex-direction: column;
+      overflow-y: auto; overflow-x: hidden;
+      flex-shrink: 0;
+    }
+    .panel-section { padding: 14px; border-bottom: 1px solid var(--border); }
+    .panel-section:last-child { border-bottom: none; }
+    .section-label {
+      font-size: 10px; font-weight: 700;
+      letter-spacing: 0.08em; text-transform: uppercase;
+      color: var(--text-secondary); margin-bottom: 11px;
+    }
+
+    /* ── Upload ── */
+    .upload-zone {
+      border: 1.5px dashed var(--border);
+      border-radius: var(--radius);
+      padding: 12px; text-align: center;
+      cursor: pointer;
+      transition: border-color 0.15s, background 0.15s;
+      position: relative; overflow: hidden;
+      margin-bottom: 8px;
+    }
+    .upload-zone:last-child { margin-bottom: 0; }
+    .upload-zone:hover, .upload-zone.drag-over {
+      border-color: var(--accent);
+      background: rgba(110,110,255,0.05);
+    }
+    .upload-zone.has-image { border-style: solid; border-color: var(--border); padding: 0; }
+    .upload-zone input[type="file"] {
+      position: absolute; inset: 0; opacity: 0; cursor: pointer; width: 100%; height: 100%;
+    }
+    .upload-placeholder { pointer-events: none; }
+    .upload-icon { width: 26px; height: 26px; margin: 0 auto 7px; color: var(--text-secondary); }
+    .upload-title { font-size: 12px; font-weight: 500; color: var(--text); margin-bottom: 2px; }
+    .upload-hint { font-size: 11px; color: var(--text-secondary); }
+    .upload-preview { width: 100%; height: 100px; object-fit: cover; border-radius: var(--radius); display: block; pointer-events: none; }
+    .upload-preview-label {
+      font-size: 11px; color: var(--text-secondary); padding: 5px 8px;
+      display: flex; align-items: center; justify-content: space-between;
+    }
+    .clear-btn {
+      background: none; border: none; color: var(--text-secondary);
+      cursor: pointer; font-size: 13px; line-height: 1; padding: 2px 4px;
+      border-radius: 4px; transition: color 0.15s, background 0.15s;
+    }
+    .clear-btn:hover { color: var(--danger); background: rgba(255,107,107,0.1); }
+
+    /* ── Source tabs (Upload vs Figma) ── */
+    .source-tabs {
+      display: flex; gap: 3px; margin-bottom: 10px;
+      background: var(--bg); border: 1px solid var(--border);
+      border-radius: 7px; padding: 3px;
+    }
+    .source-tab {
+      flex: 1; padding: 5px 0; border: none; border-radius: 5px;
+      background: transparent; color: var(--text-secondary);
+      font-size: 11px; font-weight: 500; cursor: pointer;
+      transition: background 0.15s, color 0.15s;
+      display: flex; align-items: center; justify-content: center; gap: 4px;
+    }
+    .source-tab.active { background: var(--surface-2); color: var(--text); }
+    .source-tab:hover:not(.active) { color: var(--text); }
+
+    /* ── Figma import form ── */
+    .figma-form { display: flex; flex-direction: column; gap: 8px; }
+    .figma-form-field { display: flex; flex-direction: column; gap: 4px; }
+    .form-label { font-size: 10px; font-weight: 600; color: var(--text-secondary); letter-spacing: 0.04em; text-transform: uppercase; }
+    .form-input {
+      padding: 7px 9px;
+      background: var(--bg); border: 1px solid var(--border);
+      border-radius: 6px; color: var(--text); font-size: 11px;
+      outline: none; width: 100%;
+      transition: border-color 0.15s;
+    }
+    .form-input:focus { border-color: var(--accent); }
+    .form-input::placeholder { color: var(--text-secondary); }
+    .form-select {
+      padding: 7px 9px;
+      background: var(--bg); border: 1px solid var(--border);
+      border-radius: 6px; color: var(--text); font-size: 11px;
+      outline: none; width: 100%; cursor: pointer;
+      transition: border-color 0.15s;
+    }
+    .form-select:focus { border-color: var(--accent); }
+    .custom-dims { display: flex; gap: 6px; }
+    .custom-dims .form-input { width: 50%; }
+    .figma-status {
+      font-size: 10px; color: var(--accent); min-height: 14px;
+      display: flex; align-items: center; gap: 5px;
+    }
+    .figma-status.error { color: var(--danger); }
+    .figma-status.success { color: var(--success); }
+    .figma-preview-badge {
+      display: inline-flex; align-items: center; gap: 5px;
+      font-size: 10px; color: var(--success);
+      padding: 3px 8px; background: rgba(78,203,113,0.1);
+      border: 1px solid rgba(78,203,113,0.25); border-radius: 4px; margin-top: 2px;
+    }
+
+    /* ── Controls ── */
+    .control-row { margin-bottom: 13px; }
+    .control-row:last-child { margin-bottom: 0; }
+    .control-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 7px; }
+    .control-label { font-size: 12px; font-weight: 500; color: var(--text); }
+    .control-value { font-size: 11px; color: var(--accent); font-weight: 600; min-width: 34px; text-align: right; }
+
+    input[type="range"] {
+      -webkit-appearance: none; appearance: none;
+      width: 100%; height: 3px;
+      background: var(--border); border-radius: 4px;
+      outline: none; cursor: pointer;
+    }
+    input[type="range"]::-webkit-slider-thumb {
+      -webkit-appearance: none; appearance: none;
+      width: 13px; height: 13px; border-radius: 50%;
+      background: var(--accent); cursor: pointer;
+      transition: background 0.15s, transform 0.1s;
+    }
+    input[type="range"]::-webkit-slider-thumb:hover { background: var(--accent-hover); transform: scale(1.2); }
+    input[type="range"]::-moz-range-thumb {
+      width: 13px; height: 13px; border-radius: 50%;
+      background: var(--accent); cursor: pointer; border: none;
+    }
+
+    .zoom-row { display: flex; align-items: center; gap: 7px; }
+    .zoom-btn {
+      width: 26px; height: 26px;
+      border: 1px solid var(--border); border-radius: 6px;
+      background: var(--surface-2); color: var(--text);
+      font-size: 15px; cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+      transition: background 0.15s, border-color 0.15s;
+      flex-shrink: 0;
+    }
+    .zoom-btn:hover { background: var(--border); border-color: var(--accent); }
+
+    .action-btn {
+      width: 100%; padding: 8px;
+      border: 1px solid var(--border); border-radius: var(--radius);
+      background: var(--surface-2); color: var(--text-secondary);
+      font-size: 12px; font-weight: 500; cursor: pointer;
+      transition: background 0.15s, color 0.15s, border-color 0.15s;
+      text-align: center;
+    }
+    .action-btn:hover { background: var(--border); color: var(--text); border-color: var(--accent); }
+    .action-btn.primary {
+      background: var(--accent); border-color: var(--accent);
+      color: #fff; font-weight: 600; font-size: 13px;
+      padding: 9px;
+    }
+    .action-btn.primary:hover { background: var(--accent-hover); border-color: var(--accent-hover); }
+    .action-btn.primary:disabled {
+      background: var(--surface-2); border-color: var(--border);
+      color: var(--text-secondary); cursor: not-allowed;
+    }
+    .action-btn-row { display: flex; gap: 6px; }
+    .action-btn-row .action-btn { width: auto; flex: 1; padding: 7px 8px; }
+
+    /* ── Kbd hints ── */
+    .kbd-hints { display: flex; flex-direction: column; gap: 5px; }
+    .kbd-row { display: flex; align-items: center; justify-content: space-between; font-size: 11px; color: var(--text-secondary); }
+    kbd { background: var(--surface-2); border: 1px solid var(--border); border-radius: 4px; padding: 1px 5px; font-size: 10px; font-family: inherit; color: var(--text); }
+
+    /* ── Smart diff panel sections ── */
+    .diff-running-state {
+      display: flex; flex-direction: column; align-items: center; gap: 8px; padding: 16px 0;
+    }
+    .spinner {
+      width: 22px; height: 22px;
+      border: 2px solid var(--border);
+      border-top-color: var(--accent);
+      border-radius: 50%;
+      animation: spin 0.7s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .running-text { font-size: 12px; color: var(--text-secondary); }
+
+    .diff-results-header {
+      display: flex; align-items: center; justify-content: space-between;
+      margin-bottom: 10px;
+    }
+    .diff-count { font-size: 12px; font-weight: 600; color: var(--text); }
+    .diff-score {
+      font-size: 11px; font-weight: 700; padding: 2px 7px;
+      border-radius: 20px; color: #fff;
+    }
+    .diff-score.good { background: #2d6a3f; color: var(--success); border: 1px solid #3d8a54; }
+    .diff-score.warn { background: #5a3e00; color: var(--warning); border: 1px solid #7a5500; }
+    .diff-score.bad  { background: #5a1a1a; color: var(--danger);  border: 1px solid #7a2a2a; }
+
+    .diff-region-list { display: flex; flex-direction: column; gap: 5px; max-height: 320px; overflow-y: auto; }
+    .diff-region-item {
+      display: flex; gap: 8px; align-items: flex-start;
+      padding: 8px 9px; border-radius: 6px;
+      border: 1px solid transparent;
+      background: var(--surface-2);
+      cursor: pointer; transition: border-color 0.15s, background 0.15s;
+    }
+    .diff-region-item:hover { border-color: var(--accent); background: rgba(110,110,255,0.06); }
+    .diff-region-item.active { border-color: var(--accent); background: rgba(110,110,255,0.1); }
+    .region-num {
+      width: 18px; height: 18px; border-radius: 4px;
+      background: var(--accent); color: #fff;
+      font-size: 10px; font-weight: 700; text-align: center; line-height: 18px;
+      flex-shrink: 0;
+    }
+    .region-info { flex: 1; min-width: 0; }
+    .region-title { font-size: 12px; font-weight: 500; color: var(--text); margin-bottom: 2px; }
+    .region-meta { font-size: 10px; color: var(--text-secondary); }
+    .sev-dot {
+      width: 7px; height: 7px; border-radius: 50%;
+      flex-shrink: 0; margin-top: 5px;
+    }
+    .sev-dot.critical { background: #ff4444; }
+    .sev-dot.high     { background: var(--warning); }
+    .sev-dot.medium   { background: #60a5fa; }
+    .sev-dot.low      { background: var(--text-secondary); }
+
+    /* ── AI panel ── */
+    .ai-panel {
+      width: 0; min-width: 0;
+      background: var(--surface);
+      border-left: 1px solid var(--border);
+      overflow: hidden;
+      flex-shrink: 0;
+      transition: width 0.25s ease;
+      display: flex; flex-direction: column;
+    }
+    .ai-panel.open { width: var(--ai-panel-w); }
+    .ai-panel-inner { width: var(--ai-panel-w); display: flex; flex-direction: column; height: 100%; overflow: hidden; }
+
+    .ai-panel-header {
+      padding: 14px 16px; border-bottom: 1px solid var(--border);
+      display: flex; align-items: center; justify-content: space-between;
+      flex-shrink: 0;
+    }
+    .ai-panel-title { font-size: 13px; font-weight: 600; }
+    .ai-panel-close {
+      background: none; border: none; color: var(--text-secondary);
+      cursor: pointer; font-size: 16px; padding: 2px 5px; border-radius: 4px;
+      transition: color 0.15s, background 0.15s;
+    }
+    .ai-panel-close:hover { color: var(--text); background: var(--surface-2); }
+
+    /* AI config form */
+    .ai-config { padding: 14px 16px; border-bottom: 1px solid var(--border); flex-shrink: 0; }
+    .provider-tabs { display: flex; gap: 4px; margin-bottom: 12px; }
+    .provider-tab {
+      flex: 1; padding: 6px 0; border: 1px solid var(--border);
+      border-radius: 6px; background: var(--surface-2);
+      color: var(--text-secondary); font-size: 12px; font-weight: 500;
+      cursor: pointer; text-align: center;
+      transition: background 0.15s, color 0.15s, border-color 0.15s;
+    }
+    .provider-tab.active { background: rgba(110,110,255,0.12); border-color: var(--accent); color: var(--accent); }
+    .provider-tab:hover:not(.active) { color: var(--text); }
+
+    .field-label { font-size: 11px; font-weight: 600; color: var(--text-secondary); margin-bottom: 5px; letter-spacing: 0.03em; text-transform: uppercase; }
+    .api-key-field {
+      display: flex; gap: 6px; margin-bottom: 10px;
+    }
+    .api-key-input {
+      flex: 1; padding: 7px 10px;
+      background: var(--bg); border: 1px solid var(--border);
+      border-radius: 6px; color: var(--text); font-size: 12px;
+      font-family: monospace; outline: none;
+      transition: border-color 0.15s;
+    }
+    .api-key-input:focus { border-color: var(--accent); }
+    .api-key-input::placeholder { color: var(--text-secondary); font-family: -apple-system, sans-serif; }
+
+    .model-hint { font-size: 10px; color: var(--text-secondary); margin-bottom: 10px; }
+
+    /* AI results */
+    .ai-results { flex: 1; overflow-y: auto; padding: 0; }
+    .ai-empty {
+      display: flex; flex-direction: column; align-items: center;
+      justify-content: center; height: 200px; gap: 8px;
+      color: var(--text-secondary); font-size: 12px;
+      text-align: center; padding: 20px;
+    }
+    .ai-empty-icon { width: 32px; height: 32px; opacity: 0.3; }
+
+    .ai-loading { display: flex; flex-direction: column; align-items: center; gap: 10px; padding: 40px 20px; }
+    .ai-loading-text { font-size: 12px; color: var(--text-secondary); text-align: center; }
+
+    .score-section { padding: 16px; border-bottom: 1px solid var(--border); }
+    .score-row { display: flex; align-items: center; gap: 14px; }
+    .score-gauge-wrap { position: relative; width: 64px; height: 64px; flex-shrink: 0; }
+    .score-gauge-svg { width: 64px; height: 64px; transform: rotate(-90deg); }
+    .score-gauge-bg { fill: none; stroke: var(--border); stroke-width: 5; }
+    .score-gauge-fill { fill: none; stroke-width: 5; stroke-linecap: round; transition: stroke-dasharray 0.6s ease; }
+    .score-label {
+      position: absolute; inset: 0;
+      display: flex; flex-direction: column;
+      align-items: center; justify-content: center;
+    }
+    .score-num { font-size: 16px; font-weight: 700; line-height: 1; }
+    .score-pct { font-size: 9px; color: var(--text-secondary); }
+    .score-meta { flex: 1; }
+    .score-title { font-size: 13px; font-weight: 600; margin-bottom: 4px; }
+    .score-summary { font-size: 11px; color: var(--text-secondary); line-height: 1.5; }
+
+    .findings-section { padding: 10px 14px; }
+    .findings-filter {
+      display: flex; gap: 4px; flex-wrap: wrap; margin-bottom: 10px;
+    }
+    .filter-pill {
+      padding: 3px 9px; border-radius: 20px;
+      border: 1px solid var(--border); background: var(--surface-2);
+      color: var(--text-secondary); font-size: 10px; font-weight: 500;
+      cursor: pointer; transition: all 0.15s;
+    }
+    .filter-pill.active { border-color: var(--accent); background: rgba(110,110,255,0.1); color: var(--accent); }
+    .filter-pill:hover:not(.active) { color: var(--text); }
+
+    .finding-card {
+      padding: 10px 11px; border-radius: 7px;
+      border: 1px solid var(--border);
+      background: var(--bg); margin-bottom: 6px;
+      cursor: pointer; transition: border-color 0.15s, background 0.15s;
+    }
+    .finding-card:hover { border-color: #3e3e50; background: #131318; }
+    .finding-card:last-child { margin-bottom: 0; }
+    .finding-header { display: flex; align-items: flex-start; gap: 7px; margin-bottom: 5px; }
+    .finding-sev {
+      padding: 1px 6px; border-radius: 3px;
+      font-size: 9px; font-weight: 700; letter-spacing: 0.04em;
+      text-transform: uppercase; flex-shrink: 0; margin-top: 1px;
+    }
+    .finding-sev.critical { background: rgba(255,68,68,0.15); color: #ff6060; border: 1px solid rgba(255,68,68,0.3); }
+    .finding-sev.high     { background: rgba(245,166,35,0.15); color: #f5a623; border: 1px solid rgba(245,166,35,0.3); }
+    .finding-sev.medium   { background: rgba(96,165,250,0.15); color: #60a5fa; border: 1px solid rgba(96,165,250,0.3); }
+    .finding-sev.low      { background: rgba(136,136,147,0.12); color: #888893; border: 1px solid rgba(136,136,147,0.2); }
+    .finding-title { font-size: 12px; font-weight: 500; color: var(--text); flex: 1; line-height: 1.3; }
+    .finding-body { font-size: 11px; color: var(--text-secondary); line-height: 1.5; margin-bottom: 5px; }
+    .finding-suggestion {
+      font-size: 10px; color: var(--success); line-height: 1.4;
+      padding: 4px 7px; background: rgba(78,203,113,0.06);
+      border-radius: 4px; border-left: 2px solid rgba(78,203,113,0.4);
+    }
+    .finding-cat {
+      display: inline-flex; align-items: center; gap: 4px;
+      font-size: 10px; color: var(--text-secondary);
+      padding: 1px 6px; border-radius: 3px;
+      background: var(--surface-2); margin-bottom: 5px;
+    }
+
+    /* ── Viewport ── */
+    .canvas-viewport {
+      flex: 1; position: relative; overflow: hidden;
+      background: repeating-conic-gradient(#1c1c22 0% 25%, #17171c 0% 50%) 0 0 / 24px 24px;
+      cursor: grab;
+      min-width: 0;
+    }
+    .canvas-viewport:active { cursor: grabbing; }
+    .canvas-viewport.no-images { cursor: default; display: flex; align-items: center; justify-content: center; }
+
+    .empty-state { text-align: center; max-width: 320px; padding: 20px; }
+    .empty-icon { width: 52px; height: 52px; margin: 0 auto 14px; opacity: 0.2; }
+    .empty-title { font-size: 15px; font-weight: 600; margin-bottom: 7px; }
+    .empty-subtitle { font-size: 12px; color: var(--text-secondary); line-height: 1.5; }
+
+    #overlay-container {
+      position: absolute; transform-origin: 0 0;
+    }
+    #overlay-container img {
+      position: absolute; top: 0; left: 0; display: block; max-width: none;
+    }
+    #img-design     { z-index: 1; }
+    #img-screenshot { z-index: 2; }
+
+    /* Smart diff canvas sits on top of images */
+    #smart-diff-canvas {
+      position: absolute; top: 0; left: 0; z-index: 3;
+      pointer-events: none; display: none;
+    }
+
+    /* Annotation boxes */
+    .ann-box {
+      position: absolute; z-index: 4; pointer-events: none;
+      border-radius: 3px;
+      transition: opacity 0.2s;
+    }
+    .ann-label {
+      position: absolute; top: -18px; left: -1px;
+      background: var(--accent); color: #fff;
+      font-size: 9px; font-weight: 700;
+      padding: 1px 5px; border-radius: 3px 3px 3px 0;
+      line-height: 16px; white-space: nowrap;
+    }
+
+    /* Side-by-side */
+    #side-by-side-container {
+      position: absolute; top: 0; left: 0; transform-origin: 0 0; display: none;
+    }
+    .sbs-side { position: absolute; top: 0; }
+    .sbs-label {
+      position: absolute; top: 8px; left: 8px;
+      font-size: 10px; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase;
+      padding: 3px 7px; border-radius: 4px; pointer-events: none; z-index: 10;
+    }
+
+    /* HUD overlays */
+    .zoom-indicator {
+      position: absolute; bottom: 14px; right: 14px;
+      background: rgba(26,26,31,0.88);
+      border: 1px solid var(--border); border-radius: 6px;
+      padding: 4px 9px; font-size: 11px; font-weight: 600;
+      color: var(--text-secondary); pointer-events: none;
+    }
+    .hint-bar {
+      position: absolute; bottom: 14px; left: 50%; transform: translateX(-50%);
+      background: rgba(26,26,31,0.88); border: 1px solid var(--border);
+      border-radius: 6px; padding: 4px 12px;
+      font-size: 11px; color: var(--text-secondary);
+      pointer-events: none; white-space: nowrap; display: none;
+    }
+    .diff-status-bar {
+      position: absolute; top: 12px; left: 50%; transform: translateX(-50%);
+      background: rgba(110,110,255,0.15); border: 1px solid rgba(110,110,255,0.35);
+      border-radius: 6px; padding: 5px 14px;
+      font-size: 11px; color: var(--accent); font-weight: 500;
+      pointer-events: none; white-space: nowrap; display: none;
+    }
+
+    /* ── Scrollbar ── */
+    ::-webkit-scrollbar { width: 5px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
+    ::-webkit-scrollbar-thumb:hover { background: #3e3e4a; }
+  </style>
+</head>
+<body>
+
+<!-- ── Header ── -->
+<header>
+  <svg style="width:18px;height:18px;color:var(--accent);flex-shrink:0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+    <rect x="3" y="3" width="8" height="8" rx="1.5"/><rect x="13" y="3" width="8" height="8" rx="1.5"/>
+    <rect x="3" y="13" width="8" height="8" rx="1.5"/><rect x="13" y="13" width="8" height="8" rx="1.5"/>
+  </svg>
+  <div>
+    <h1>Design Diff</h1>
+    <div class="tagline">Figma vs Implementation QA</div>
+  </div>
+  <div class="header-right">
+    <div class="mode-group" id="mode-group">
+      <button class="mode-btn active" data-mode="overlay"><span class="dot"></span>Overlay</button>
+      <button class="mode-btn" data-mode="side-by-side"><span class="dot"></span>Side by Side</button>
+      <button class="mode-btn" data-mode="smart-diff"><span class="dot"></span>Smart Diff</button>
+      <button class="mode-btn" data-mode="ai"><span class="dot"></span>AI Analysis</button>
+    </div>
+  </div>
+</header>
+
+<!-- ── Workspace ── -->
+<div class="workspace">
+
+  <!-- ── Left panel ── -->
+  <div class="panel" id="left-panel">
+
+    <!-- Images -->
+    <div class="panel-section">
+      <div class="section-label">Baseline Design</div>
+
+      <!-- Source toggle -->
+      <div class="source-tabs" id="design-source-tabs">
+        <button class="source-tab active" data-source="upload">
+          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M17 8l-5-5-5 5M12 3v12"/></svg>
+          Upload
+        </button>
+        <button class="source-tab" data-source="figma">
+          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="3.5"/><rect x="14" y="3" width="7" height="7" rx="3.5"/><circle cx="17.5" cy="17.5" r="3.5"/></svg>
+          From Figma
+        </button>
+      </div>
+
+      <!-- Upload tab -->
+      <div id="design-upload-tab">
+        <div class="upload-zone" id="zone-design">
+          <input type="file" id="input-design" accept="image/*" />
+          <div class="upload-placeholder" id="placeholder-design">
+            <svg class="upload-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+              <rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/>
+            </svg>
+            <div class="upload-title">Design / Figma export</div>
+            <div class="upload-hint">Click or drag image here</div>
+          </div>
+          <div id="preview-design" style="display:none">
+            <img class="upload-preview" id="thumb-design" alt="" />
+            <div class="upload-preview-label">
+              <span id="name-design" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:155px"></span>
+              <button class="clear-btn" data-target="design">✕</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Figma import tab -->
+      <div id="design-figma-tab" style="display:none">
+        <div class="figma-form">
+          <div class="figma-form-field">
+            <div class="form-label">Figma Personal Access Token</div>
+            <input class="form-input" type="password" id="figma-pat-input"
+              placeholder="figd_xxxxxx…"
+              title="Generate at figma.com → Settings → Personal access tokens" />
+            <div style="font-size:10px;color:var(--text-secondary);margin-top:2px">
+              figma.com → Profile → Settings → Security → Access tokens
+            </div>
+          </div>
+
+          <div class="figma-form-field">
+            <div class="form-label">Frame URL</div>
+            <input class="form-input" type="text" id="figma-url-input"
+              placeholder="https://figma.com/design/…?node-id=…"
+              title="Right-click a frame in Figma → Copy link to selection" />
+            <div style="font-size:10px;color:var(--text-secondary);margin-top:2px">
+              Right-click frame → Copy link to selection
+            </div>
+          </div>
+
+          <div class="figma-form-field">
+            <div class="form-label">Screenshot device</div>
+            <select class="form-select" id="phone-model-select">
+              <optgroup label="iPhone">
+                <option value="iphone-16-pro-max">iPhone 16 Pro Max (1290×2796)</option>
+                <option value="iphone-16-pro">iPhone 16 Pro (1179×2556)</option>
+                <option value="iphone-16-plus">iPhone 16 Plus (1290×2796)</option>
+                <option value="iphone-16" selected>iPhone 16 (1170×2532)</option>
+                <option value="iphone-15-pro-max">iPhone 15 Pro Max (1290×2796)</option>
+                <option value="iphone-15-pro">iPhone 15 Pro (1179×2556)</option>
+                <option value="iphone-15">iPhone 15 (1179×2556)</option>
+                <option value="iphone-14-pro-max">iPhone 14 Pro Max (1290×2796)</option>
+                <option value="iphone-14">iPhone 14 (1170×2532)</option>
+                <option value="iphone-se-3">iPhone SE 3rd gen (750×1334)</option>
+              </optgroup>
+              <optgroup label="Android">
+                <option value="samsung-s25-ultra">Samsung S25 Ultra (1440×3120)</option>
+                <option value="samsung-s24-ultra">Samsung S24 Ultra (1440×3088)</option>
+                <option value="samsung-s24">Samsung S24 (1080×2340)</option>
+                <option value="pixel-9-pro">Google Pixel 9 Pro (1344×2992)</option>
+                <option value="pixel-9">Google Pixel 9 (1080×2400)</option>
+                <option value="pixel-8">Google Pixel 8 (1080×2400)</option>
+                <option value="oneplus-12">OnePlus 12 (1440×3168)</option>
+              </optgroup>
+              <optgroup label="Other">
+                <option value="custom">Custom dimensions…</option>
+              </optgroup>
+            </select>
+          </div>
+
+          <div id="custom-dims-row" style="display:none">
+            <div class="form-label" style="margin-bottom:4px">Custom size (px)</div>
+            <div class="custom-dims">
+              <input class="form-input" type="number" id="custom-w" placeholder="Width" min="1" />
+              <input class="form-input" type="number" id="custom-h" placeholder="Height" min="1" />
+            </div>
+          </div>
+
+          <button class="action-btn primary" id="figma-import-btn">Import from Figma</button>
+          <div class="figma-status" id="figma-status"></div>
+          <div id="figma-preview-wrap" style="display:none">
+            <img class="upload-preview" id="thumb-design" alt="" style="border-radius:6px" />
+            <div class="upload-preview-label" style="padding:5px 0 0">
+              <span id="name-design" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:180px;font-size:11px;color:var(--text-secondary)"></span>
+              <button class="clear-btn" data-target="design">✕</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Screenshot upload (always file-based) -->
+    <div class="panel-section">
+      <div class="section-label">Implementation Screenshot</div>
+      <div class="upload-zone" id="zone-screenshot">
+        <input type="file" id="input-screenshot" accept="image/*" />
+        <div class="upload-placeholder" id="placeholder-screenshot">
+          <svg class="upload-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+            <rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/>
+          </svg>
+          <div class="upload-title">Screenshot / Implementation</div>
+          <div class="upload-hint">Click or drag image here</div>
+        </div>
+        <div id="preview-screenshot" style="display:none">
+          <img class="upload-preview" id="thumb-screenshot" alt="" />
+          <div class="upload-preview-label">
+            <span id="name-screenshot" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:155px"></span>
+            <button class="clear-btn" data-target="screenshot">✕</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Overlay mode controls -->
+    <div class="panel-section" id="section-overlay">
+      <div class="section-label">Overlay</div>
+      <div class="control-row">
+        <div class="control-header">
+          <span class="control-label">Screenshot Opacity</span>
+          <span class="control-value" id="opacity-val">50%</span>
+        </div>
+        <input type="range" id="opacity-slider" min="0" max="100" value="50" />
+      </div>
+      <div class="control-row">
+        <div class="control-header">
+          <span class="control-label">Design Opacity</span>
+          <span class="control-value" id="design-opacity-val">100%</span>
+        </div>
+        <input type="range" id="design-opacity-slider" min="0" max="100" value="100" />
+      </div>
+    </div>
+
+    <!-- Zoom (always visible) -->
+    <div class="panel-section" id="section-zoom">
+      <div class="section-label">Zoom & Pan</div>
+      <div class="control-row">
+        <div class="zoom-row">
+          <button class="zoom-btn" id="zoom-out">−</button>
+          <input type="range" id="zoom-slider" min="10" max="800" value="100" style="flex:1" />
+          <button class="zoom-btn" id="zoom-in">+</button>
+        </div>
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-top:8px">
+          <span id="zoom-val" style="font-size:12px;color:var(--accent);font-weight:600">100%</span>
+          <button class="action-btn" style="width:auto;padding:4px 9px;font-size:11px" id="fit-btn">Fit</button>
+        </div>
+      </div>
+      <button class="action-btn" id="reset-btn" style="margin-top:4px">Reset position</button>
+    </div>
+
+    <!-- Smart diff settings -->
+    <div class="panel-section" id="section-smart-diff" style="display:none">
+      <div class="section-label">Smart Diff</div>
+      <div class="control-row">
+        <div class="control-header">
+          <span class="control-label">Sensitivity</span>
+          <span class="control-value" id="threshold-val">10</span>
+        </div>
+        <input type="range" id="threshold-slider" min="3" max="60" value="10" />
+        <div style="font-size:10px;color:var(--text-secondary);margin-top:4px">Lower = detects more differences</div>
+      </div>
+      <div class="control-row">
+        <div class="control-header">
+          <span class="control-label">Noise Reduction (Blur)</span>
+          <span class="control-value" id="blur-val">1px</span>
+        </div>
+        <input type="range" id="blur-slider" min="0" max="4" value="1" />
+      </div>
+      <button class="action-btn primary" id="run-diff-btn" style="margin-top:4px">Run Smart Diff</button>
+    </div>
+
+    <!-- Smart diff results -->
+    <div class="panel-section" id="section-diff-results" style="display:none">
+      <div class="diff-results-header">
+        <span class="diff-count" id="diff-count">0 regions</span>
+        <span class="diff-score" id="diff-score-badge"></span>
+      </div>
+      <div class="diff-region-list" id="diff-region-list"></div>
+      <button class="action-btn" style="margin-top:8px" id="clear-diff-btn">Clear diff</button>
+    </div>
+
+    <!-- AI mode config -->
+    <div class="panel-section" id="section-ai-config" style="display:none">
+      <div class="section-label">AI Analysis</div>
+      <p style="font-size:11px;color:var(--text-secondary);line-height:1.5;margin-bottom:10px">
+        Use vision AI to semantically identify design-to-implementation differences with categories and fix suggestions.
+      </p>
+      <button class="action-btn primary" id="open-ai-panel-btn">Configure &amp; Analyze</button>
+    </div>
+
+    <!-- Keyboard shortcuts -->
+    <div class="panel-section" id="section-kbd">
+      <div class="section-label">Shortcuts</div>
+      <div class="kbd-hints">
+        <div class="kbd-row"><span>Zoom</span><kbd>Scroll</kbd></div>
+        <div class="kbd-row"><span>Pan</span><kbd>Drag</kbd></div>
+        <div class="kbd-row"><span>Fit</span><kbd>F</kbd></div>
+        <div class="kbd-row"><span>Reset</span><kbd>0</kbd></div>
+        <div class="kbd-row"><span>Opacity −/+</span><kbd>[ ]</kbd></div>
+        <div class="kbd-row"><span>Toggle design</span><kbd>D</kbd></div>
+        <div class="kbd-row"><span>Toggle screenshot</span><kbd>S</kbd></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Canvas viewport ── -->
+  <div class="canvas-viewport no-images" id="viewport">
+    <div class="empty-state" id="empty-state">
+      <svg class="empty-icon" viewBox="0 0 64 64" fill="none" stroke="currentColor" stroke-width="1.5">
+        <rect x="8" y="8" width="28" height="28" rx="3"/>
+        <rect x="28" y="28" width="28" height="28" rx="3"/>
+        <circle cx="20" cy="20" r="4"/>
+        <path d="M8 32l8-8 8 8 6-6"/>
+      </svg>
+      <div class="empty-title">Upload images to start</div>
+      <div class="empty-subtitle">Upload a Figma design and an implementation screenshot to compare them.</div>
+    </div>
+
+    <!-- Overlay mode -->
+    <div id="overlay-container">
+      <img id="img-design" alt="Design" />
+      <img id="img-screenshot" alt="Screenshot" />
+      <canvas id="smart-diff-canvas"></canvas>
+    </div>
+
+    <!-- Side-by-side mode -->
+    <div id="side-by-side-container">
+      <div class="sbs-side" id="sbs-left">
+        <img id="sbs-img-design" alt="Design" style="display:block" />
+        <div class="sbs-label" style="background:rgba(110,110,255,0.85);color:#fff">Design</div>
+      </div>
+      <div class="sbs-side" id="sbs-right">
+        <img id="sbs-img-screenshot" alt="Screenshot" style="display:block" />
+        <div class="sbs-label" style="background:rgba(78,203,113,0.85);color:#0a0a0a">Screenshot</div>
+      </div>
+    </div>
+
+    <!-- Annotation boxes injected here by JS -->
+    <div id="annotations"></div>
+
+    <div class="zoom-indicator" id="zoom-indicator">100%</div>
+    <div class="hint-bar" id="hint-bar">Scroll to zoom · Drag to pan</div>
+    <div class="diff-status-bar" id="diff-status-bar"></div>
+  </div>
+
+  <!-- ── AI Results panel ── -->
+  <div class="ai-panel" id="ai-panel">
+    <div class="ai-panel-inner">
+      <div class="ai-panel-header">
+        <span class="ai-panel-title">AI Analysis</span>
+        <button class="ai-panel-close" id="ai-panel-close">✕</button>
+      </div>
+
+      <!-- Config -->
+      <div class="ai-config">
+        <div class="provider-tabs" id="provider-tabs">
+          <button class="provider-tab active" data-provider="openai">OpenAI</button>
+          <button class="provider-tab" data-provider="gemini">Gemini 1.5 Flash</button>
+        </div>
+        <div id="openai-model-row" style="margin-bottom:10px">
+          <div class="field-label">Model</div>
+          <select id="openai-model-select" style="width:100%;padding:7px 10px;background:var(--bg);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:12px;outline:none;cursor:pointer">
+            <option value="gpt-5">gpt-5</option>
+            <option value="gpt-5.1">gpt-5.1</option>
+            <option value="gpt-4o">gpt-4o</option>
+            <option value="gpt-4o-mini">gpt-4o-mini</option>
+          </select>
+        </div>
+        <div class="field-label">API Key</div>
+        <div class="api-key-field">
+          <input class="api-key-input" type="password" id="api-key-input" placeholder="Paste your API key…" autocomplete="off" />
+        </div>
+        <div class="model-hint" id="model-hint">Key stored in memory only, never sent elsewhere</div>
+        <button class="action-btn primary" id="analyze-btn" disabled>Analyze Images</button>
+      </div>
+
+      <!-- Results area -->
+      <div class="ai-results" id="ai-results">
+        <div class="ai-empty">
+          <svg class="ai-empty-icon" viewBox="0 0 32 32" fill="none" stroke="currentColor" stroke-width="1.5">
+            <circle cx="16" cy="16" r="13"/><path d="M16 10v6l4 2"/>
+          </svg>
+          <div>Upload both images and click<br/><strong>Analyze Images</strong> to start</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div><!-- /.workspace -->
+
+<script>
+// ═══════════════════════════════════════════════════════════════
+// STATE
+// ═══════════════════════════════════════════════════════════════
+const state = {
+  designSrc: null, screenshotSrc: null,
+  opacity: 0.5, designOpacity: 1.0,
+  zoom: 1.0, panX: 0, panY: 0,
+  mode: 'overlay',
+  isPanning: false, lastPanX: 0, lastPanY: 0,
+  designSize: { w: 0, h: 0 },
+  screenshotSize: { w: 0, h: 0 },
+  diffRegions: [],
+  diffRunning: false,
+  activeRegion: -1,
+  aiProvider: 'openai',
+  aiKey: '',
+  aiRunning: false,
+  figmaPat: '',
+  designSource: 'upload',  // 'upload' | 'figma'
+};
+
+// ═══════════════════════════════════════════════════════════════
+// DOM REFS
+// ═══════════════════════════════════════════════════════════════
+const $  = id => document.getElementById(id);
+const viewport        = $('viewport');
+const emptyState      = $('empty-state');
+const overlayContainer= $('overlay-container');
+const sbsContainer    = $('side-by-side-container');
+const imgDesign       = $('img-design');
+const imgScreenshot   = $('img-screenshot');
+const sbsImgDesign    = $('sbs-img-design');
+const sbsImgScreenshot= $('sbs-img-screenshot');
+const smartDiffCanvas = $('smart-diff-canvas');
+const annotations     = $('annotations');
+const aiPanel         = $('ai-panel');
+const aiResults       = $('ai-results');
+const analyzeBtn      = $('analyze-btn');
+const apiKeyInput     = $('api-key-input');
+
+// ═══════════════════════════════════════════════════════════════
+// IMAGE PROCESSING — Lab color space + ΔE76
+// ═══════════════════════════════════════════════════════════════
+
+function rgbToLab(r, g, b) {
+  const lin = v => {
+    v /= 255;
+    return v <= 0.04045 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4);
+  };
+  const rl = lin(r), gl = lin(g), bl = lin(b);
+  const X = rl * 0.4124564 + gl * 0.3575761 + bl * 0.1804375;
+  const Y = rl * 0.2126729 + gl * 0.7151522 + bl * 0.0721750;
+  const Z = rl * 0.0193339 + gl * 0.1191920 + bl * 0.9503041;
+  const f = v => v > 0.008856 ? Math.cbrt(v) : 7.787037 * v + 16 / 116;
+  const fx = f(X / 0.95047), fy = f(Y), fz = f(Z / 1.08883);
+  return [116 * fy - 16, 500 * (fx - fy), 200 * (fy - fz)];
+}
+
+function deltaE(r1, g1, b1, r2, g2, b2) {
+  const [L1, a1, b1_] = rgbToLab(r1, g1, b1);
+  const [L2, a2, b2_] = rgbToLab(r2, g2, b2);
+  return Math.sqrt((L1 - L2) ** 2 + (a1 - a2) ** 2 + (b1_ - b2_) ** 2);
+}
+
+// Separable box blur (fast, good approximation)
+function boxBlur(data, w, h, r) {
+  if (r === 0) return new Uint8ClampedArray(data);
+  const tmp = new Float32Array(w * h * 4);
+  // Horizontal
+  for (let y = 0; y < h; y++) {
+    for (let x = 0; x < w; x++) {
+      let sr = 0, sg = 0, sb = 0, cnt = 0;
+      for (let dx = -r; dx <= r; dx++) {
+        const nx = Math.max(0, Math.min(w - 1, x + dx));
+        const i = (y * w + nx) * 4;
+        sr += data[i]; sg += data[i+1]; sb += data[i+2]; cnt++;
+      }
+      const o = (y * w + x) * 4;
+      tmp[o] = sr/cnt; tmp[o+1] = sg/cnt; tmp[o+2] = sb/cnt; tmp[o+3] = 255;
+    }
+  }
+  const out = new Uint8ClampedArray(w * h * 4);
+  // Vertical
+  for (let y = 0; y < h; y++) {
+    for (let x = 0; x < w; x++) {
+      let sr = 0, sg = 0, sb = 0, cnt = 0;
+      for (let dy = -r; dy <= r; dy++) {
+        const ny = Math.max(0, Math.min(h - 1, y + dy));
+        const i = (ny * w + x) * 4;
+        sr += tmp[i]; sg += tmp[i+1]; sb += tmp[i+2]; cnt++;
+      }
+      const o = (y * w + x) * 4;
+      out[o] = sr/cnt; out[o+1] = sg/cnt; out[o+2] = sb/cnt; out[o+3] = 255;
+    }
+  }
+  return out;
+}
+
+// Separable morphological dilation (square structuring element)
+function dilate(mask, w, h, r) {
+  const tmp = new Uint8Array(w * h);
+  // Horizontal pass
+  for (let y = 0; y < h; y++) {
+    for (let x = 0; x < w; x++) {
+      const xs = Math.max(0, x - r), xe = Math.min(w - 1, x + r);
+      for (let nx = xs; nx <= xe; nx++) {
+        if (mask[y * w + nx]) { tmp[y * w + x] = 1; break; }
+      }
+    }
+  }
+  const out = new Uint8Array(w * h);
+  // Vertical pass
+  for (let y = 0; y < h; y++) {
+    for (let x = 0; x < w; x++) {
+      const ys = Math.max(0, y - r), ye = Math.min(h - 1, y + r);
+      for (let ny = ys; ny <= ye; ny++) {
+        if (tmp[ny * w + x]) { out[y * w + x] = 1; break; }
+      }
+    }
+  }
+  return out;
+}
+
+// Connected components (two-pass with union-find)
+function connectedComponents(mask, w, h) {
+  const labels = new Int32Array(w * h).fill(-1);
+  const parent = [];
+  const rankArr = [];
+
+  function find(x) {
+    while (parent[x] !== x) { parent[x] = parent[parent[x]]; x = parent[x]; }
+    return x;
+  }
+  function union(a, b) {
+    a = find(a); b = find(b);
+    if (a === b) return;
+    if (rankArr[a] < rankArr[b]) { parent[a] = b; }
+    else if (rankArr[a] > rankArr[b]) { parent[b] = a; }
+    else { parent[b] = a; rankArr[a]++; }
+  }
+
+  let next = 0;
+  // First pass
+  for (let y = 0; y < h; y++) {
+    for (let x = 0; x < w; x++) {
+      if (!mask[y * w + x]) continue;
+      const left = x > 0 && mask[y * w + (x-1)] ? labels[y * w + (x-1)] : -1;
+      const top  = y > 0 && mask[(y-1) * w + x] ? labels[(y-1) * w + x] : -1;
+      if (left === -1 && top === -1) {
+        labels[y * w + x] = next; parent.push(next); rankArr.push(0); next++;
+      } else if (left !== -1 && top === -1) {
+        labels[y * w + x] = left;
+      } else if (left === -1 && top !== -1) {
+        labels[y * w + x] = top;
+      } else {
+        labels[y * w + x] = left; union(left, top);
+      }
+    }
+  }
+
+  // Second pass: collect bounding boxes
+  const comps = new Map();
+  for (let i = 0; i < w * h; i++) {
+    if (labels[i] === -1) continue;
+    const root = find(labels[i]);
+    if (!comps.has(root)) comps.set(root, { px: 0, x1: w, x2: 0, y1: h, y2: 0, sumDE: 0 });
+    const c = comps.get(root);
+    const x = i % w, y = Math.floor(i / w);
+    c.px++;
+    if (x < c.x1) c.x1 = x; if (x > c.x2) c.x2 = x;
+    if (y < c.y1) c.y1 = y; if (y > c.y2) c.y2 = y;
+  }
+  return Array.from(comps.values());
+}
+
+// ═══════════════════════════════════════════════════════════════
+// SMART DIFF ENGINE
+// ═══════════════════════════════════════════════════════════════
+
+function getImagePixels(imgEl, w, h) {
+  const off = document.createElement('canvas');
+  off.width = w; off.height = h;
+  const ctx = off.getContext('2d');
+  ctx.drawImage(imgEl, 0, 0, w, h);
+  return ctx.getImageData(0, 0, w, h).data;
+}
+
+async function runSmartDiff() {
+  if (state.diffRunning) return;
+  if (!state.designSrc || !state.screenshotSrc) {
+    showDiffStatus('Upload both images first', 3000); return;
+  }
+  state.diffRunning = true;
+  $('run-diff-btn').disabled = true;
+  $('run-diff-btn').textContent = 'Analyzing…';
+  showDiffStatus('Running smart diff…');
+
+  // Yield to let UI update
+  await new Promise(r => setTimeout(r, 20));
+
+  try {
+    const threshold  = parseInt($('threshold-slider').value);
+    const blurRadius = parseInt($('blur-slider').value);
+
+    // Use design dimensions as reference; cap at 900px for perf
+    const refW = state.designSize.w || imgDesign.naturalWidth;
+    const refH = state.designSize.h || imgDesign.naturalHeight;
+    const scale = Math.min(1, 900 / Math.max(refW, refH));
+    const W = Math.round(refW * scale), H = Math.round(refH * scale);
+
+    await new Promise(r => setTimeout(r, 10));
+
+    // Get pixel data (scaled, blurred)
+    let pixA = getImagePixels(imgDesign, W, H);
+    let pixB = getImagePixels(imgScreenshot, W, H);
+    pixA = boxBlur(pixA, W, H, blurRadius);
+    pixB = boxBlur(pixB, W, H, blurRadius);
+
+    await new Promise(r => setTimeout(r, 10));
+
+    // Compute ΔE mask + heatmap values
+    const mask   = new Uint8Array(W * H);
+    const deMap  = new Float32Array(W * H);
+    let maxDE = 0;
+
+    for (let i = 0; i < W * H; i++) {
+      const p = i * 4;
+      const de = deltaE(pixA[p], pixA[p+1], pixA[p+2], pixB[p], pixB[p+1], pixB[p+2]);
+      deMap[i] = de;
+      if (de > maxDE) maxDE = de;
+      if (de > threshold) mask[i] = 1;
+    }
+
+    await new Promise(r => setTimeout(r, 10));
+
+    // Dilate to fill small gaps between nearby diff pixels
+    const dilated = dilate(mask, W, H, 5);
+
+    // Connected components
+    const rawComps = connectedComponents(dilated, W, H);
+    const minArea = Math.max(40, W * H * 0.0001); // 0.01% of image
+
+    // Compute average ΔE for each component using original (non-dilated) mask
+    const compMap = new Map();
+    rawComps.forEach((c, idx) => { compMap.set(idx, c); c.sumDE = 0; c.origPx = 0; });
+
+    // Annotate sumDE from original mask
+    // We need to re-map pixels to their components — use a simplified approach
+    // Just sample ΔE within each bounding box for speed
+    const filtered = rawComps
+      .filter(c => c.px >= minArea)
+      .map(c => {
+        let sum = 0, cnt = 0;
+        for (let y = c.y1; y <= c.y2; y += 2) {
+          for (let x = c.x1; x <= c.x2; x += 2) {
+            const de = deMap[y * W + x];
+            if (de > threshold) { sum += de; cnt++; }
+          }
+        }
+        c.avgDE = cnt > 0 ? sum / cnt : threshold;
+        // Scale bbox back to original image coordinates
+        const invScale = 1 / scale;
+        return {
+          x: Math.round(c.x1 * invScale),
+          y: Math.round(c.y1 * invScale),
+          w: Math.round((c.x2 - c.x1 + 1) * invScale),
+          h: Math.round((c.y2 - c.y1 + 1) * invScale),
+          px: c.px,
+          avgDE: c.avgDE,
+          // Scaled coords for canvas rendering
+          sx: c.x1, sy: c.y1,
+          sw: c.x2 - c.x1 + 1,
+          sh: c.y2 - c.y1 + 1,
+        };
+      })
+      .sort((a, b) => b.px - a.px)
+      .slice(0, 20);
+
+    // Render heatmap on smart-diff-canvas
+    const imgW = state.designSize.w, imgH = state.designSize.h;
+    smartDiffCanvas.width  = W;
+    smartDiffCanvas.height = H;
+    smartDiffCanvas.style.width  = imgW + 'px';
+    smartDiffCanvas.style.height = imgH + 'px';
+    smartDiffCanvas.style.display = 'block';
+
+    const ctx = smartDiffCanvas.getContext('2d');
+    const imgData = ctx.createImageData(W, H);
+    for (let i = 0; i < W * H; i++) {
+      const de = deMap[i];
+      if (de > threshold) {
+        const t = Math.min(1, (de - threshold) / (maxDE - threshold + 0.01));
+        imgData.data[i*4]   = 255;
+        imgData.data[i*4+1] = Math.round(80 * (1 - t));
+        imgData.data[i*4+2] = Math.round(60 * (1 - t));
+        imgData.data[i*4+3] = Math.round(140 * t + 60);
+      }
+    }
+    ctx.putImageData(imgData, 0, 0);
+
+    state.diffRegions = filtered;
+    renderDiffAnnotations(filtered, imgW, imgH, W, H);
+    renderDiffResults(filtered, imgW, imgH);
+
+    const pct = computeFidelityScore(filtered, imgW * imgH);
+    const badge = $('diff-score-badge');
+    badge.textContent = pct + '% fidelity';
+    badge.className = 'diff-score ' + (pct >= 85 ? 'good' : pct >= 60 ? 'warn' : 'bad');
+
+    $('section-diff-results').style.display = '';
+    hideDiffStatus();
+
+  } catch (e) {
+    showDiffStatus('Error: ' + e.message, 4000);
+    console.error(e);
+  }
+
+  $('run-diff-btn').disabled = false;
+  $('run-diff-btn').textContent = 'Run Smart Diff';
+  state.diffRunning = false;
+}
+
+function computeFidelityScore(regions, totalPx) {
+  if (!totalPx || regions.length === 0) return 100;
+  let diffPx = 0;
+  regions.forEach(r => { diffPx += r.w * r.h; });
+  const ratio = Math.min(1, diffPx / totalPx);
+  return Math.round((1 - ratio) * 100);
+}
+
+function getSeverity(avgDE, area) {
+  if (avgDE > 45 || area > 80000) return 'critical';
+  if (avgDE > 25 || area > 20000) return 'high';
+  if (avgDE > 12 || area > 4000)  return 'medium';
+  return 'low';
+}
+
+function getRegionLocation(x, y, w, h, imgW, imgH) {
+  const cx = x + w / 2, cy = y + h / 2;
+  const col = cx < imgW / 3 ? 'left' : cx < (2 * imgW / 3) ? 'center' : 'right';
+  const row = cy < imgH / 3 ? 'top' : cy < (2 * imgH / 3) ? 'middle' : 'bottom';
+  if (row === 'middle' && col === 'center') return 'center';
+  return row + (col !== 'center' ? '-' + col : '');
+}
+
+function renderDiffAnnotations(regions, imgW, imgH, scaledW, scaledH) {
+  clearAnnotations();
+  const container = overlayContainer;
+  const scaleX = imgW / scaledW, scaleY = imgH / scaledH;
+
+  regions.forEach((r, i) => {
+    const box = document.createElement('div');
+    box.className = 'ann-box';
+    const sev = getSeverity(r.avgDE, r.w * r.h);
+    const colors = { critical: '#ff4444', high: '#f5a623', medium: '#60a5fa', low: '#888893' };
+    box.style.cssText = `
+      left:${r.sx * scaleX}px; top:${r.sy * scaleY}px;
+      width:${r.sw * scaleX}px; height:${r.sh * scaleY}px;
+      border: 2px solid ${colors[sev]};
+    `;
+    const label = document.createElement('div');
+    label.className = 'ann-label';
+    label.style.background = colors[sev];
+    label.textContent = '#' + (i + 1);
+    box.appendChild(label);
+    box.dataset.idx = i;
+    container.appendChild(box);
+  });
+}
+
+function clearAnnotations() {
+  // Remove ann-box elements from overlay container
+  overlayContainer.querySelectorAll('.ann-box').forEach(el => el.remove());
+}
+
+function renderDiffResults(regions, imgW, imgH) {
+  const list = $('diff-region-list');
+  list.innerHTML = '';
+  $('diff-count').textContent = regions.length + ' region' + (regions.length !== 1 ? 's' : '') + ' found';
+
+  if (regions.length === 0) {
+    list.innerHTML = '<div style="font-size:12px;color:var(--text-secondary);text-align:center;padding:12px">No significant differences detected</div>';
+    return;
+  }
+
+  regions.forEach((r, i) => {
+    const sev = getSeverity(r.avgDE, r.w * r.h);
+    const loc = getRegionLocation(r.x, r.y, r.w, r.h, imgW, imgH);
+    const area = r.w * r.h;
+    const item = document.createElement('div');
+    item.className = 'diff-region-item';
+    item.innerHTML = `
+      <div class="region-num">${i + 1}</div>
+      <div class="region-info">
+        <div class="region-title">${loc.charAt(0).toUpperCase() + loc.slice(1)} region</div>
+        <div class="region-meta">ΔE ${r.avgDE.toFixed(1)} · ${r.w}×${r.h}px · ${sev}</div>
+      </div>
+      <div class="sev-dot ${sev}"></div>
+    `;
+    item.addEventListener('click', () => zoomToRegion(i));
+    list.appendChild(item);
+  });
+}
+
+function zoomToRegion(idx) {
+  const r = state.diffRegions[idx];
+  if (!r) return;
+
+  // Highlight active
+  document.querySelectorAll('.diff-region-item').forEach((el, i) => {
+    el.classList.toggle('active', i === idx);
+  });
+  overlayContainer.querySelectorAll('.ann-box').forEach((el, i) => {
+    el.style.opacity = i === idx ? '1' : '0.3';
+  });
+  state.activeRegion = idx;
+
+  // Zoom to fit the region with padding
+  const pad = 60;
+  const vw = viewport.clientWidth, vh = viewport.clientHeight;
+  const targetZoom = Math.min(4, Math.min((vw - pad * 2) / r.w, (vh - pad * 2) / r.h));
+  state.zoom = targetZoom;
+  state.panX = vw / 2 - (r.x + r.w / 2) * targetZoom;
+  state.panY = vh / 2 - (r.y + r.h / 2) * targetZoom;
+  applyTransform();
+}
+
+function showDiffStatus(msg, autoHide = 0) {
+  const bar = $('diff-status-bar');
+  bar.textContent = msg;
+  bar.style.display = 'block';
+  if (autoHide) setTimeout(() => { bar.style.display = 'none'; }, autoHide);
+}
+function hideDiffStatus() { $('diff-status-bar').style.display = 'none'; }
+
+// ═══════════════════════════════════════════════════════════════
+// AI ANALYSIS
+// ═══════════════════════════════════════════════════════════════
+
+function imageToBase64(imgEl, maxPx = 1280) {
+  const nw = imgEl.naturalWidth, nh = imgEl.naturalHeight;
+  const scale = Math.min(1, maxPx / Math.max(nw, nh));
+  const w = Math.round(nw * scale), h = Math.round(nh * scale);
+  const c = document.createElement('canvas');
+  c.width = w; c.height = h;
+  c.getContext('2d').drawImage(imgEl, 0, 0, w, h);
+  return c.toDataURL('image/jpeg', 0.82).split(',')[1];
+}
+
+const AI_PROMPT = `You are a senior design QA engineer. You will compare two images:
+- Image 1: The Figma/design specification (what it SHOULD look like)
+- Image 2: The actual implementation screenshot (what it DOES look like)
+
+Analyze every visual discrepancy between the design and implementation. Be precise and actionable.
+
+Return ONLY raw JSON — no markdown, no code fences, no explanation before or after. Start your response with { and end with }.
+{
+  "summary": "2-3 sentence overall assessment",
+  "fidelity_score": 82,
+  "differences": [
+    {
+      "id": 1,
+      "category": "spacing",
+      "severity": "high",
+      "title": "Button padding too small",
+      "description": "The primary CTA button has 8px vertical padding in implementation vs 16px specified in design.",
+      "region": "bottom-center",
+      "suggestion": "Set padding-top and padding-bottom to 16px on .btn-primary"
+    }
+  ]
+}
+
+Categories: spacing, typography, color, layout, missing_element, extra_element, icon, border_radius, shadow, alignment, sizing, other
+Severity: critical (blocking UX/brand), high (major visual deviation), medium (noticeable), low (subtle)
+Region: top-left, top-center, top-right, middle-left, center, middle-right, bottom-left, bottom-center, bottom-right, full
+Fidelity score: 0-100 where 100 is pixel-perfect. Be realistic and strict.`;
+
+async function analyzeWithOpenAI(b64design, b64screenshot, apiKey) {
+  const model = document.getElementById('openai-model-select').value;
+  const resp = await fetch('https://api.openai.com/v1/chat/completions', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + apiKey },
+    body: JSON.stringify({
+      model,
+      max_completion_tokens: 4096,
+      response_format: { type: 'json_object' },  // force valid JSON output always
+      messages: [
+        {
+          role: 'system',
+          content: 'You are a design QA expert. Always respond with a single valid JSON object exactly matching the schema the user specifies. No markdown, no prose.'
+        },
+        {
+          role: 'user',
+          content: [
+            { type: 'text', text: AI_PROMPT },
+            { type: 'image_url', image_url: { url: 'data:image/jpeg;base64,' + b64design,     detail: 'high' } },
+            { type: 'image_url', image_url: { url: 'data:image/jpeg;base64,' + b64screenshot,  detail: 'high' } },
+          ]
+        }
+      ]
+    })
+  });
+  if (!resp.ok) {
+    const err = await resp.json().catch(() => ({}));
+    throw new Error(err.error?.message || `OpenAI API error ${resp.status}`);
+  }
+  const data = await resp.json();
+  console.log('[DesignDiff] OpenAI raw response:', data);
+
+  const choice = data.choices?.[0];
+  const finish = choice?.finish_reason;
+  const content = choice?.message?.content ?? '';
+
+  if (!content) {
+    const reason = finish === 'content_filter' ? 'content_filter refusal' : (finish || 'unknown');
+    throw new Error(`Model returned empty content (finish_reason: ${reason}). Check your images don't trigger content policy.`);
+  }
+  if (finish === 'length') {
+    console.warn('[DesignDiff] Response truncated — try smaller images or fewer expected differences.');
+  }
+  return content;
+}
+
+async function analyzeWithGemini(b64design, b64screenshot, apiKey) {
+  const resp = await fetch(
+    `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        contents: [{
+          parts: [
+            { text: AI_PROMPT },
+            { inline_data: { mime_type: 'image/jpeg', data: b64design } },
+            { inline_data: { mime_type: 'image/jpeg', data: b64screenshot } },
+          ]
+        }],
+        generationConfig: { maxOutputTokens: 4096, temperature: 0.1, responseMimeType: 'application/json' }
+      })
+    }
+  );
+  if (!resp.ok) {
+    const err = await resp.json().catch(() => ({}));
+    throw new Error(err.error?.message || 'Gemini API error ' + resp.status);
+  }
+  const data = await resp.json();
+  console.log('[DesignDiff] Gemini raw response:', data);
+  const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
+  if (!text) throw new Error('Gemini returned empty content. Check API key and image sizes.');
+  return text.trim();
+}
+
+function parseAIResponse(text) {
+  // 1. Strip markdown code fences if present (```json ... ``` or ``` ... ```)
+  let cleaned = text.replace(/^```(?:json)?\s*/i, '').replace(/\s*```\s*$/, '').trim();
+
+  // 2. Try parsing the whole cleaned string first
+  try { return JSON.parse(cleaned); } catch (_) {}
+
+  // 3. Find the first '{' and extract a balanced JSON object from there
+  const start = cleaned.indexOf('{');
+  if (start !== -1) {
+    let depth = 0, inStr = false, escape = false;
+    for (let i = start; i < cleaned.length; i++) {
+      const ch = cleaned[i];
+      if (escape)          { escape = false; continue; }
+      if (ch === '\\')     { escape = true;  continue; }
+      if (ch === '"')      { inStr = !inStr;  continue; }
+      if (inStr)           { continue; }
+      if (ch === '{')      { depth++; }
+      else if (ch === '}') { depth--; if (depth === 0) {
+        try { return JSON.parse(cleaned.slice(start, i + 1)); } catch (_) { break; }
+      }}
+    }
+  }
+
+  // 4. Nothing worked — show the raw response so it's debuggable
+  const preview = text.length > 400 ? text.slice(0, 400) + '…' : text;
+  throw new Error('Could not parse AI response as JSON.\n\nRaw response:\n' + preview);
+}
+
+async function runAIAnalysis() {
+  if (state.aiRunning) return;
+  if (!state.designSrc || !state.screenshotSrc) {
+    renderAIError('Upload both images before analyzing.'); return;
+  }
+  if (!state.aiKey.trim()) {
+    renderAIError('Enter your API key first.'); return;
+  }
+
+  state.aiRunning = true;
+  analyzeBtn.disabled = true;
+  analyzeBtn.textContent = 'Analyzing…';
+  renderAILoading();
+
+  try {
+    const b64design     = imageToBase64(imgDesign);
+    const b64screenshot = imageToBase64(imgScreenshot);
+
+    const selectedModel = state.aiProvider === 'openai'
+      ? document.getElementById('openai-model-select').value
+      : 'gemini-1.5-flash';
+    let raw;
+    if (state.aiProvider === 'openai') {
+      raw = await analyzeWithOpenAI(b64design, b64screenshot, state.aiKey);
+    } else {
+      raw = await analyzeWithGemini(b64design, b64screenshot, state.aiKey);
+    }
+
+    const result = parseAIResponse(raw);
+    renderAIResults(result);
+
+  } catch (e) {
+    renderAIError(e.message);
+  }
+
+  state.aiRunning = false;
+  analyzeBtn.disabled = false;
+  analyzeBtn.textContent = 'Analyze Images';
+}
+
+function renderAILoading() {
+  const modelLabel = state.aiProvider === 'openai'
+    ? document.getElementById('openai-model-select').value
+    : 'Gemini 1.5 Flash';
+  aiResults.innerHTML = `
+    <div class="ai-loading">
+      <div class="spinner"></div>
+      <div class="ai-loading-text">
+        Sending images to ${modelLabel}…<br/>
+        This may take 10–20 seconds
+      </div>
+    </div>`;
+}
+
+function renderAIError(msg) {
+  const safe = msg.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  aiResults.innerHTML = `
+    <div style="padding:16px">
+      <div style="background:rgba(255,107,107,0.1);border:1px solid rgba(255,107,107,0.3);border-radius:7px;padding:12px;font-size:12px;color:#ff8080;line-height:1.6;white-space:pre-wrap;word-break:break-word">
+        <strong>Error</strong>\n${safe}
+      </div>
+    </div>`;
+}
+
+const CAT_LABELS = {
+  spacing: 'Spacing', typography: 'Typography', color: 'Color',
+  layout: 'Layout', missing_element: 'Missing Element', extra_element: 'Extra Element',
+  icon: 'Icon', border_radius: 'Border Radius', shadow: 'Shadow',
+  alignment: 'Alignment', sizing: 'Sizing', other: 'Other',
+};
+const CAT_ICONS = {
+  spacing: '⇔', typography: 'T', color: '◉', layout: '▦',
+  missing_element: '−', extra_element: '+', icon: '◈', border_radius: '⌒',
+  shadow: '☁', alignment: '≡', sizing: '⊞', other: '◇',
+};
+
+function renderAIResults(data) {
+  const score = Math.max(0, Math.min(100, Math.round(data.fidelity_score)));
+  const scoreColor = score >= 85 ? '#4ecb71' : score >= 60 ? '#f5a623' : '#ff6b6b';
+  const circumference = 2 * Math.PI * 24;
+  const dash = (score / 100) * circumference;
+
+  // Count by severity
+  const diffs = data.differences || [];
+  const counts = { critical: 0, high: 0, medium: 0, low: 0 };
+  diffs.forEach(d => { if (counts[d.severity] !== undefined) counts[d.severity]++; });
+
+  aiResults.innerHTML = `
+    <div class="score-section">
+      <div class="score-row">
+        <div class="score-gauge-wrap">
+          <svg class="score-gauge-svg" viewBox="0 0 56 56">
+            <circle class="score-gauge-bg" cx="28" cy="28" r="24"/>
+            <circle class="score-gauge-fill" cx="28" cy="28" r="24"
+              stroke="${scoreColor}"
+              stroke-dasharray="${dash.toFixed(1)} ${circumference.toFixed(1)}"
+              stroke-dashoffset="0"/>
+          </svg>
+          <div class="score-label">
+            <span class="score-num" style="color:${scoreColor}">${score}</span>
+            <span class="score-pct">/ 100</span>
+          </div>
+        </div>
+        <div class="score-meta">
+          <div class="score-title">Design Fidelity</div>
+          <div style="display:flex;gap:8px;margin-bottom:6px;flex-wrap:wrap">
+            ${counts.critical ? `<span style="font-size:10px;color:#ff6060">${counts.critical} critical</span>` : ''}
+            ${counts.high     ? `<span style="font-size:10px;color:#f5a623">${counts.high} high</span>` : ''}
+            ${counts.medium   ? `<span style="font-size:10px;color:#60a5fa">${counts.medium} medium</span>` : ''}
+            ${counts.low      ? `<span style="font-size:10px;color:#888893">${counts.low} low</span>` : ''}
+          </div>
+          <div class="score-summary">${data.summary || ''}</div>
+        </div>
+      </div>
+    </div>
+    <div class="findings-section">
+      <div style="font-size:11px;font-weight:700;letter-spacing:0.06em;text-transform:uppercase;color:var(--text-secondary);margin-bottom:10px">
+        ${diffs.length} Finding${diffs.length !== 1 ? 's' : ''}
+      </div>
+      <div id="ai-finding-list">
+        ${diffs.map(d => `
+          <div class="finding-card">
+            <div class="finding-cat">${CAT_ICONS[d.category] || '◇'} ${CAT_LABELS[d.category] || d.category} · ${d.region || ''}</div>
+            <div class="finding-header">
+              <span class="finding-sev ${d.severity}">${d.severity}</span>
+              <span class="finding-title">${d.title}</span>
+            </div>
+            <div class="finding-body">${d.description}</div>
+            ${d.suggestion ? `<div class="finding-suggestion">Fix: ${d.suggestion}</div>` : ''}
+          </div>`).join('')}
+        ${diffs.length === 0 ? '<div style="font-size:12px;color:var(--text-secondary);text-align:center;padding:20px">No differences found — looking great!</div>' : ''}
+      </div>
+    </div>`;
+}
+
+// ═══════════════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════════════
+// FIGMA IMPORT
+// ═══════════════════════════════════════════════════════════════
+
+const PHONE_MODELS = {
+  'iphone-16-pro-max': { w: 1290, h: 2796 },
+  'iphone-16-pro':     { w: 1179, h: 2556 },
+  'iphone-16-plus':    { w: 1290, h: 2796 },
+  'iphone-16':         { w: 1170, h: 2532 },
+  'iphone-15-pro-max': { w: 1290, h: 2796 },
+  'iphone-15-pro':     { w: 1179, h: 2556 },
+  'iphone-15':         { w: 1179, h: 2556 },
+  'iphone-14-pro-max': { w: 1290, h: 2796 },
+  'iphone-14':         { w: 1170, h: 2532 },
+  'iphone-se-3':       { w: 750,  h: 1334 },
+  'samsung-s25-ultra': { w: 1440, h: 3120 },
+  'samsung-s24-ultra': { w: 1440, h: 3088 },
+  'samsung-s24':       { w: 1080, h: 2340 },
+  'pixel-9-pro':       { w: 1344, h: 2992 },
+  'pixel-9':           { w: 1080, h: 2400 },
+  'pixel-8':           { w: 1080, h: 2400 },
+  'oneplus-12':        { w: 1440, h: 3168 },
+};
+
+function parseFigmaUrl(url) {
+  // Handles: /design/:fileKey/... and /file/:fileKey/...
+  const fileMatch = url.match(/figma\.com\/(?:design|file)\/([A-Za-z0-9_-]+)/);
+  if (!fileMatch) return null;
+  const nodeMatch = url.match(/node-id=([^&#\s]+)/);
+  const nodeId = nodeMatch
+    ? decodeURIComponent(nodeMatch[1]).replace(/-/g, ':')
+    : null;
+  return { fileKey: fileMatch[1], nodeId };
+}
+
+function setFigmaStatus(msg, type = '') {
+  const el = $('figma-status');
+  el.textContent = msg;
+  el.className = 'figma-status' + (type ? ' ' + type : '');
+}
+
+async function runFigmaImport() {
+  const pat      = $('figma-pat-input').value.trim();
+  const figmaUrl = $('figma-url-input').value.trim();
+  const phoneKey = $('phone-model-select').value;
+
+  if (!pat)      { setFigmaStatus('Enter your Figma Personal Access Token.', 'error'); return; }
+  if (!figmaUrl) { setFigmaStatus('Enter the Figma frame URL.', 'error'); return; }
+
+  const parsed = parseFigmaUrl(figmaUrl);
+  if (!parsed)          { setFigmaStatus('URL not recognized. Use a figma.com/design/… URL.', 'error'); return; }
+  if (!parsed.nodeId)   { setFigmaStatus('URL needs a node-id. Right-click the frame → Copy link to selection.', 'error'); return; }
+
+  $('figma-import-btn').disabled = true;
+  $('figma-import-btn').textContent = 'Importing…';
+  setFigmaStatus('Fetching frame info…');
+
+  try {
+    // 1. Get frame dimensions from nodes endpoint
+    const nodesResp = await fetch(
+      `https://api.figma.com/v1/files/${parsed.fileKey}/nodes?ids=${encodeURIComponent(parsed.nodeId)}`,
+      { headers: { 'X-Figma-Token': pat } }
+    );
+    if (!nodesResp.ok) {
+      const e = await nodesResp.json().catch(() => ({}));
+      throw new Error(e.err || e.message || `Figma API ${nodesResp.status} — check your PAT and file permissions.`);
+    }
+    const nodesData = await nodesResp.json();
+
+    // Figma returns node IDs with ':' in the payload even when URL uses '-'
+    const nodeKey = Object.keys(nodesData.nodes || {})[0];
+    const nodeDoc = nodesData.nodes?.[nodeKey]?.document;
+    if (!nodeDoc) throw new Error(`Frame not found. Make sure the URL points to a specific frame (not the file root).`);
+
+    const frameW   = nodeDoc.absoluteBoundingBox?.width  ?? 390;
+    const frameH   = nodeDoc.absoluteBoundingBox?.height ?? 844;
+    const frameName = nodeDoc.name || 'Figma frame';
+
+    // 2. Calculate export scale to match device physical resolution
+    let targetW;
+    if (phoneKey === 'custom') {
+      targetW = parseInt($('custom-w').value) || frameW * 3;
+    } else {
+      targetW = PHONE_MODELS[phoneKey]?.w ?? frameW * 3;
+    }
+    // Figma API max scale is 4; minimum sensible is 1
+    const scale = Math.min(4, Math.max(1, Math.round((targetW / frameW) * 10) / 10));
+
+    setFigmaStatus(`Exporting "${frameName}" at ${scale}× (${Math.round(frameW * scale)}×${Math.round(frameH * scale)}px)…`);
+
+    // 3. Request export URL from Figma
+    const imagesResp = await fetch(
+      `https://api.figma.com/v1/images/${parsed.fileKey}?ids=${encodeURIComponent(nodeKey)}&format=png&scale=${scale}`,
+      { headers: { 'X-Figma-Token': pat } }
+    );
+    if (!imagesResp.ok) throw new Error(`Export failed: Figma API ${imagesResp.status}`);
+    const imagesData = await imagesResp.json();
+    if (imagesData.err) throw new Error(`Figma export error: ${imagesData.err}`);
+
+    const imageUrl = imagesData.images?.[nodeKey];
+    if (!imageUrl) throw new Error('Figma returned no image URL. The node may not be renderable.');
+
+    // 4. Fetch image as a blob → blob URL avoids all canvas CORS taint issues
+    setFigmaStatus('Downloading image…');
+    const imgResp = await fetch(imageUrl);
+    if (!imgResp.ok) throw new Error(`CDN download failed (${imgResp.status})`);
+    const blob    = await imgResp.blob();
+    const blobUrl = URL.createObjectURL(blob);
+
+    // 5. Load into app exactly like a file upload
+    state.designSrc = blobUrl;
+    state.figmaPat  = pat;   // persist for re-use
+    imgDesign.crossOrigin = '';  // blob URLs are same-origin, no CORS needed
+    imgDesign.src = blobUrl;
+    sbsImgDesign.src = blobUrl;
+    imgDesign.onload = () => {
+      state.designSize = { w: imgDesign.naturalWidth, h: imgDesign.naturalHeight };
+      updateLayout();
+      fitToScreen();
+    };
+
+    // Update preview
+    $('thumb-design').src = blobUrl;
+    $('name-design').textContent = `${frameName} · ${Math.round(frameW * scale)}×${Math.round(frameH * scale)}px`;
+    $('figma-preview-wrap').style.display = 'block';
+    setFigmaStatus(`Loaded "${frameName}" at ${scale}× scale`, 'success');
+
+  } catch (err) {
+    setFigmaStatus(err.message, 'error');
+    console.error('[DesignDiff] Figma import error:', err);
+  }
+
+  $('figma-import-btn').disabled = false;
+  $('figma-import-btn').textContent = 'Import from Figma';
+}
+
+// Source tab toggle
+document.getElementById('design-source-tabs').addEventListener('click', e => {
+  const tab = e.target.closest('.source-tab');
+  if (!tab) return;
+  document.querySelectorAll('.source-tab').forEach(t => t.classList.remove('active'));
+  tab.classList.add('active');
+  state.designSource = tab.dataset.source;
+  $('design-upload-tab').style.display = state.designSource === 'upload' ? '' : 'none';
+  $('design-figma-tab').style.display  = state.designSource === 'figma'  ? '' : 'none';
+});
+
+$('phone-model-select').addEventListener('change', () => {
+  $('custom-dims-row').style.display = $('phone-model-select').value === 'custom' ? '' : 'none';
+});
+
+$('figma-import-btn').addEventListener('click', runFigmaImport);
+
+// Persist PAT in sessionStorage so it survives accidental reloads (not localStorage — more private)
+$('figma-pat-input').addEventListener('input', () => {
+  state.figmaPat = $('figma-pat-input').value;
+  try { sessionStorage.setItem('ddiff_figma_pat', state.figmaPat); } catch(_) {}
+});
+// Restore on load
+try {
+  const saved = sessionStorage.getItem('ddiff_figma_pat');
+  if (saved) { $('figma-pat-input').value = saved; state.figmaPat = saved; }
+} catch(_) {}
+
+// ═══════════════════════════════════════════════════════════════
+// FILE UPLOADS
+// ═══════════════════════════════════════════════════════════════
+
+function setupUpload(inputId, zoneId, phId, prevId, thumbId, nameId, target) {
+  const input = $(inputId), zone = $(zoneId), ph = $(phId), prev = $(prevId);
+  const thumb = $(thumbId), nameEl = $(nameId);
+
+  function loadFile(file) {
+    if (!file || !file.type.startsWith('image/')) return;
+    const url = URL.createObjectURL(file);
+    if (target === 'design') {
+      state.designSrc = url;
+      imgDesign.src = url; sbsImgDesign.src = url;
+      imgDesign.onload = () => { state.designSize = { w: imgDesign.naturalWidth, h: imgDesign.naturalHeight }; updateLayout(); };
+    } else {
+      state.screenshotSrc = url;
+      imgScreenshot.src = url; sbsImgScreenshot.src = url;
+      imgScreenshot.onload = () => { state.screenshotSize = { w: imgScreenshot.naturalWidth, h: imgScreenshot.naturalHeight }; updateLayout(); };
+    }
+    thumb.src = url; nameEl.textContent = file.name;
+    ph.style.display = 'none'; prev.style.display = 'block';
+    zone.classList.add('has-image');
+    updateAnalyzeBtn();
+  }
+
+  input.addEventListener('change', e => loadFile(e.target.files[0]));
+  zone.addEventListener('dragover', e => { e.preventDefault(); zone.classList.add('drag-over'); });
+  zone.addEventListener('dragleave', () => zone.classList.remove('drag-over'));
+  zone.addEventListener('drop', e => { e.preventDefault(); zone.classList.remove('drag-over'); loadFile(e.dataTransfer.files[0]); });
+}
+
+setupUpload('input-design',     'zone-design',      'placeholder-design',      'preview-design',      'thumb-design',      'name-design',      'design');
+setupUpload('input-screenshot', 'zone-screenshot',   'placeholder-screenshot',  'preview-screenshot',  'thumb-screenshot',  'name-screenshot',  'screenshot');
+
+document.querySelectorAll('.clear-btn').forEach(btn => {
+  btn.addEventListener('click', e => {
+    e.stopPropagation();
+    const t = btn.dataset.target;
+    if (t === 'design') {
+      state.designSrc = null; imgDesign.src = ''; sbsImgDesign.src = '';
+      $('placeholder-design').style.display = ''; $('preview-design').style.display = 'none';
+      $('zone-design').classList.remove('has-image');
+    } else {
+      state.screenshotSrc = null; imgScreenshot.src = ''; sbsImgScreenshot.src = '';
+      $('placeholder-screenshot').style.display = ''; $('preview-screenshot').style.display = 'none';
+      $('zone-screenshot').classList.remove('has-image');
+    }
+    clearDiff(); updateLayout(); updateAnalyzeBtn();
+  });
+});
+
+function updateAnalyzeBtn() {
+  const hasKey = state.aiKey.trim().length > 0;
+  const hasBoth = state.designSrc && state.screenshotSrc;
+  analyzeBtn.disabled = !(hasKey && hasBoth);
+}
+
+// ═══════════════════════════════════════════════════════════════
+// MODE SWITCHING & LAYOUT
+// ═══════════════════════════════════════════════════════════════
+
+document.getElementById('mode-group').addEventListener('click', e => {
+  const btn = e.target.closest('.mode-btn');
+  if (!btn) return;
+  document.querySelectorAll('.mode-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  state.mode = btn.dataset.mode;
+  updateLayout();
+});
+
+function hasImages() { return state.designSrc || state.screenshotSrc; }
+
+function getCanvasSize() {
+  return { w: Math.max(state.designSize.w, state.screenshotSize.w, 1), h: Math.max(state.designSize.h, state.screenshotSize.h, 1) };
+}
+
+function updateLayout() {
+  const has = hasImages();
+  viewport.classList.toggle('no-images', !has);
+  emptyState.style.display = has ? 'none' : '';
+  $('hint-bar').style.display = has ? 'block' : 'none';
+
+  // Panel section visibility
+  $('section-overlay').style.display      = state.mode === 'overlay'     ? '' : 'none';
+  $('section-smart-diff').style.display   = state.mode === 'smart-diff'  ? '' : 'none';
+  $('section-ai-config').style.display    = state.mode === 'ai'          ? '' : 'none';
+
+  // AI panel
+  if (state.mode === 'ai') {
+    aiPanel.classList.add('open');
+  } else {
+    aiPanel.classList.remove('open');
+  }
+
+  // Show/hide diff results
+  if (state.mode !== 'smart-diff') {
+    // Keep results if user switches away, but clear canvas
+    smartDiffCanvas.style.display = 'none';
+    overlayContainer.querySelectorAll('.ann-box').forEach(el => el.style.display = 'none');
+  } else {
+    smartDiffCanvas.style.display = state.diffRegions.length ? 'block' : 'none';
+    overlayContainer.querySelectorAll('.ann-box').forEach(el => el.style.display = '');
+  }
+
+  if (!has) {
+    overlayContainer.style.display = 'none';
+    sbsContainer.style.display = 'none';
+    return;
+  }
+
+  if (state.mode === 'side-by-side') {
+    overlayContainer.style.display = 'none';
+    sbsContainer.style.display = 'block';
+    renderSideBySide();
+  } else {
+    overlayContainer.style.display = 'block';
+    sbsContainer.style.display = 'none';
+    renderOverlay();
+  }
+
+  applyTransform();
+}
+
+function renderOverlay() {
+  const { w, h } = getCanvasSize();
+  overlayContainer.style.width  = w + 'px';
+  overlayContainer.style.height = h + 'px';
+  imgDesign.style.width  = w + 'px'; imgDesign.style.height  = h + 'px';
+  imgDesign.style.opacity = state.designOpacity;
+  imgScreenshot.style.width  = w + 'px'; imgScreenshot.style.height  = h + 'px';
+  imgScreenshot.style.opacity = (state.mode === 'smart-diff') ? 0 : state.opacity;
+}
+
+function renderSideBySide() {
+  const { w, h } = getCanvasSize();
+  const gap = 24;
+  sbsContainer.style.width  = (w * 2 + gap) + 'px';
+  sbsContainer.style.height = h + 'px';
+  $('sbs-left').style.cssText  = `left:0;width:${w}px;height:${h}px`;
+  $('sbs-right').style.cssText = `left:${w + gap}px;width:${w}px;height:${h}px`;
+  sbsImgDesign.style.cssText  = `width:${w}px;height:${h}px`;
+  sbsImgScreenshot.style.cssText = `width:${w}px;height:${h}px`;
+}
+
+function clearDiff() {
+  smartDiffCanvas.style.display = 'none';
+  clearAnnotations();
+  state.diffRegions = [];
+  $('section-diff-results').style.display = 'none';
+}
+
+// ═══════════════════════════════════════════════════════════════
+// ZOOM & PAN
+// ═══════════════════════════════════════════════════════════════
+
+function applyTransform() {
+  const z = state.zoom;
+  const target = state.mode === 'side-by-side' ? sbsContainer : overlayContainer;
+  target.style.transform = `translate(${state.panX}px,${state.panY}px) scale(${z})`;
+  const pct = Math.round(z * 100);
+  $('zoom-val').textContent = pct + '%';
+  $('zoom-indicator').textContent = pct + '%';
+  $('zoom-slider').value = Math.round(z * 100);
+}
+
+function fitToScreen() {
+  if (!hasImages()) return;
+  const { w, h } = state.mode === 'side-by-side'
+    ? { w: getCanvasSize().w * 2 + 24, h: getCanvasSize().h }
+    : getCanvasSize();
+  const vw = viewport.clientWidth - 80, vh = viewport.clientHeight - 80;
+  state.zoom = Math.min(vw / w, vh / h, 2.5);
+  state.panX = (viewport.clientWidth  - w * state.zoom) / 2;
+  state.panY = (viewport.clientHeight - h * state.zoom) / 2;
+  applyTransform();
+}
+
+// Controls
+$('opacity-slider').addEventListener('input', () => {
+  state.opacity = $('opacity-slider').value / 100;
+  $('opacity-val').textContent = $('opacity-slider').value + '%';
+  imgScreenshot.style.opacity = state.opacity;
+});
+$('design-opacity-slider').addEventListener('input', () => {
+  state.designOpacity = $('design-opacity-slider').value / 100;
+  $('design-opacity-val').textContent = $('design-opacity-slider').value + '%';
+  imgDesign.style.opacity = state.designOpacity;
+});
+$('threshold-slider').addEventListener('input', () => {
+  $('threshold-val').textContent = $('threshold-slider').value;
+});
+$('blur-slider').addEventListener('input', () => {
+  $('blur-val').textContent = $('blur-slider').value + 'px';
+});
+$('zoom-slider').addEventListener('input', () => {
+  state.zoom = $('zoom-slider').value / 100; applyTransform();
+});
+$('zoom-in').addEventListener('click', () => { state.zoom = Math.min(8, state.zoom * 1.2); applyTransform(); });
+$('zoom-out').addEventListener('click', () => { state.zoom = Math.max(0.08, state.zoom / 1.2); applyTransform(); });
+$('reset-btn').addEventListener('click', () => { state.zoom = 1; state.panX = 0; state.panY = 0; applyTransform(); });
+$('fit-btn').addEventListener('click', fitToScreen);
+$('run-diff-btn').addEventListener('click', runSmartDiff);
+$('clear-diff-btn').addEventListener('click', () => { clearDiff(); $('section-diff-results').style.display = 'none'; hideDiffStatus(); });
+
+// Wheel zoom
+viewport.addEventListener('wheel', e => {
+  e.preventDefault();
+  const rect = viewport.getBoundingClientRect();
+  const mx = e.clientX - rect.left, my = e.clientY - rect.top;
+  const delta = e.deltaY < 0 ? 1.1 : 0.9;
+  const nz = Math.min(8, Math.max(0.08, state.zoom * delta));
+  state.panX = mx - (mx - state.panX) * (nz / state.zoom);
+  state.panY = my - (my - state.panY) * (nz / state.zoom);
+  state.zoom = nz;
+  applyTransform();
+}, { passive: false });
+
+// Pan
+viewport.addEventListener('mousedown', e => { if (e.button !== 0) return; state.isPanning = true; state.lastPanX = e.clientX; state.lastPanY = e.clientY; });
+window.addEventListener('mousemove', e => {
+  if (!state.isPanning) return;
+  state.panX += e.clientX - state.lastPanX; state.panY += e.clientY - state.lastPanY;
+  state.lastPanX = e.clientX; state.lastPanY = e.clientY;
+  applyTransform();
+});
+window.addEventListener('mouseup', () => { state.isPanning = false; });
+
+// Touch
+let _lastDist = 0;
+viewport.addEventListener('touchstart', e => {
+  if (e.touches.length === 1) { state.isPanning = true; state.lastPanX = e.touches[0].clientX; state.lastPanY = e.touches[0].clientY; }
+  else if (e.touches.length === 2) { state.isPanning = false; _lastDist = Math.hypot(e.touches[0].clientX - e.touches[1].clientX, e.touches[0].clientY - e.touches[1].clientY); }
+}, { passive: true });
+viewport.addEventListener('touchmove', e => {
+  e.preventDefault();
+  if (e.touches.length === 1 && state.isPanning) {
+    state.panX += e.touches[0].clientX - state.lastPanX; state.panY += e.touches[0].clientY - state.lastPanY;
+    state.lastPanX = e.touches[0].clientX; state.lastPanY = e.touches[0].clientY; applyTransform();
+  } else if (e.touches.length === 2) {
+    const d = Math.hypot(e.touches[0].clientX - e.touches[1].clientX, e.touches[0].clientY - e.touches[1].clientY);
+    const mx = (e.touches[0].clientX + e.touches[1].clientX) / 2 - viewport.getBoundingClientRect().left;
+    const my = (e.touches[0].clientY + e.touches[1].clientY) / 2 - viewport.getBoundingClientRect().top;
+    const nz = Math.min(8, Math.max(0.08, state.zoom * d / _lastDist));
+    state.panX = mx - (mx - state.panX) * (nz / state.zoom); state.panY = my - (my - state.panY) * (nz / state.zoom);
+    state.zoom = nz; _lastDist = d; applyTransform();
+  }
+}, { passive: false });
+viewport.addEventListener('touchend', () => { state.isPanning = false; });
+
+// Keyboard
+document.addEventListener('keydown', e => {
+  if (['INPUT', 'TEXTAREA'].includes(e.target.tagName)) return;
+  switch (e.key) {
+    case 'f': case 'F': fitToScreen(); break;
+    case '0': state.zoom = 1; state.panX = 0; state.panY = 0; applyTransform(); break;
+    case '[': {
+      const v = Math.max(0, state.opacity - 0.05);
+      state.opacity = v; $('opacity-slider').value = Math.round(v * 100);
+      $('opacity-val').textContent = Math.round(v * 100) + '%'; imgScreenshot.style.opacity = v; break;
+    }
+    case ']': {
+      const v = Math.min(1, state.opacity + 0.05);
+      state.opacity = v; $('opacity-slider').value = Math.round(v * 100);
+      $('opacity-val').textContent = Math.round(v * 100) + '%'; imgScreenshot.style.opacity = v; break;
+    }
+    case 'd': case 'D': {
+      state.designOpacity = state.designOpacity > 0 ? 0 : 1;
+      $('design-opacity-slider').value = state.designOpacity * 100;
+      $('design-opacity-val').textContent = (state.designOpacity * 100) + '%';
+      imgDesign.style.opacity = state.designOpacity; break;
+    }
+    case 's': case 'S': {
+      state.opacity = state.opacity > 0 ? 0 : 0.5;
+      $('opacity-slider').value = Math.round(state.opacity * 100);
+      $('opacity-val').textContent = Math.round(state.opacity * 100) + '%';
+      imgScreenshot.style.opacity = state.opacity; break;
+    }
+  }
+});
+
+// ═══════════════════════════════════════════════════════════════
+// AI PANEL UI
+// ═══════════════════════════════════════════════════════════════
+
+$('open-ai-panel-btn').addEventListener('click', () => {
+  // Switch to AI mode
+  document.querySelectorAll('.mode-btn').forEach(b => b.classList.toggle('active', b.dataset.mode === 'ai'));
+  state.mode = 'ai'; updateLayout();
+  apiKeyInput.focus();
+});
+
+$('ai-panel-close').addEventListener('click', () => {
+  aiPanel.classList.remove('open');
+  document.querySelectorAll('.mode-btn').forEach(b => b.classList.toggle('active', b.dataset.mode === 'overlay'));
+  state.mode = 'overlay'; updateLayout();
+});
+
+$('provider-tabs').addEventListener('click', e => {
+  const tab = e.target.closest('.provider-tab');
+  if (!tab) return;
+  document.querySelectorAll('.provider-tab').forEach(t => t.classList.remove('active'));
+  tab.classList.add('active');
+  state.aiProvider = tab.dataset.provider;
+  $('openai-model-row').style.display = state.aiProvider === 'openai' ? '' : 'none';
+  $('model-hint').textContent = state.aiProvider === 'gemini'
+    ? 'Using: gemini-1.5-flash · Key stored in memory only'
+    : 'Key stored in memory only, never sent elsewhere';
+});
+
+apiKeyInput.addEventListener('input', () => {
+  state.aiKey = apiKeyInput.value;
+  updateAnalyzeBtn();
+});
+
+analyzeBtn.addEventListener('click', runAIAnalysis);
+
+// ═══════════════════════════════════════════════════════════════
+// INIT
+// ═══════════════════════════════════════════════════════════════
+updateLayout();
+window.addEventListener('resize', () => { if (hasImages()) fitToScreen(); });
+</script>
+</body>
+</html>
